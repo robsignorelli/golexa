@@ -1,7 +1,3 @@
-build:
+run-sample:
 	@ \
-	go build -o out/golexa cmd/main.go
-
-run:
-	@ \
-	./out/golexa
+	go run sample/cmd/main.go

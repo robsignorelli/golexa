@@ -72,6 +72,44 @@ For an ever-so-slightly more complex example, you can look in the
 [sample/](https://github.com/robsignorelli/golexa/tree/master/sample) directory
 for a simple TODO list skill.
 
+## Middleware
+
+There are some units of work you want to execute in most/all of your
+intent handlers. For instance you might want to log every incoming
+request or validate that a user has linked their Amazon account to 
+your system before doing any real work. All of this can be done using
+middleware, similar to how you might do this in a REST API.
+
+```
+func main() {
+    middleware := golexa.Middleware{
+        LogRequest,
+        ValidateUser,
+    }
+    
+    // Log & authenticate the add/remove intents, but not the status intent.
+    service := FancyService{}
+    skill.RouteIntent("FancyAddIntent", middleware.Then(service.Add))
+    skill.RouteIntent("FancyRemoveIntent", middleware.Then(service.Remove))
+    skill.RouteIntent("FancyStatusIntent", service.Status)
+    golexa.Start(skill)
+}
+
+func LogRequest(ctx context.Context, request Request, next HandlerFunc) (Response, error) {
+    fmt.Println("... log something interesting ...")
+    return next(ctx, request)
+}
+
+func ValidateUser(ctx context.Context, request Request, next HandlerFunc) (Response, error) {
+    if request.Session.User.AccessToken == "" {
+        return golexa.NewResponse().Speak("No soup for you.").Ok()
+    }
+    return next(ctx, request)
+}
+```
+
+
+
 ## Future Enhancements
 
 Here are a couple of the things I plan to bang away at. If you have any
@@ -79,7 +117,6 @@ other ideas that could help you in your projects, feel free to add
 an issue and I'll take a look.
 
 * Tests
-* Middleware for intent handlers
 * Some sort of templating to make generating speech responses easier
 * Echo Show display template directive support
 * Name free interactions through `CanFulfillIntentRequest`
