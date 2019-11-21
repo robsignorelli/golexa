@@ -15,10 +15,14 @@ func main() {
 }
 
 func registerSkillIntents(skill *golexa.Skill) {
-	todoService := sample.NewTodoService()
-	skill.RouteIntent(sample.IntentAddTodoItem, todoService.Add)
-	skill.RouteIntent(sample.IntentRemoveTodoItem, todoService.Remove)
-	skill.RouteIntent(sample.IntentListTodoItems, todoService.List)
+	middleware := golexa.Middleware{
+		sample.LogRequest,
+		sample.ValidateUser,
+	}
+	todo := sample.NewTodoService()
+	skill.RouteIntent(sample.IntentAddTodoItem, middleware.Then(todo.Add))
+	skill.RouteIntent(sample.IntentRemoveTodoItem, middleware.Then(todo.Remove))
+	skill.RouteIntent(sample.IntentListTodoItems, middleware.Then(todo.List))
 }
 
 func registerAmazonIntents(skill *golexa.Skill) {
