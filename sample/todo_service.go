@@ -3,11 +3,9 @@ package sample
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/robsignorelli/golexa"
 	"github.com/robsignorelli/golexa/speech"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/text/language"
 )
 
@@ -153,27 +151,4 @@ func ValidateUser(ctx context.Context, request golexa.Request, next golexa.Handl
 		return golexa.NewResponse(request).Speak("I'm sorry. Please link your account through the Alexa app.").Ok()
 	}
 	return next(ctx, request)
-}
-
-// LogRequest prints some JSON logging that includes the current time and the incoming request JSON. It also
-// writes a second log line once the request is complete, outputting how long the request took.
-func LogRequest(ctx context.Context, request golexa.Request, next golexa.HandlerFunc) (golexa.Response, error) {
-	logrus.WithField("label", "golexa").
-		WithField("request_id", request.Body.RequestID).
-		WithField("payload", request).
-		Infof("Request started")
-
-	// The call to next() doesn't need to be the last line, so we can do more work after the "real"
-	// request handling work has been done.
-	startTime := time.Now()
-	response, err := next(ctx, request)
-	elapsed := time.Now().Sub(startTime)
-
-	logrus.WithField("label", "golexa").
-		WithField("request_id", request.Body.RequestID).
-		WithField("elapsed", elapsed).
-		WithField("elapsed_human", elapsed.String()).
-		Infof("Request complete")
-
-	return response, err
 }

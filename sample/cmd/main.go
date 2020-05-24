@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/robsignorelli/golexa"
+	"github.com/robsignorelli/golexa/middleware"
 	"github.com/robsignorelli/golexa/sample"
 )
 
@@ -15,14 +16,16 @@ func main() {
 }
 
 func registerSkillIntents(skill *golexa.Skill) {
-	middleware := golexa.Middleware{
-		sample.LogRequest,
+	mw := golexa.Middleware{
+		middleware.Logger(
+			middleware.LogRequestJSON(),
+			middleware.LogResponseSpeech()),
 		sample.ValidateUser,
 	}
 	todo := sample.NewTodoService()
-	skill.RouteIntent(sample.IntentAddTodoItem, middleware.Then(todo.Add))
-	skill.RouteIntent(sample.IntentRemoveTodoItem, middleware.Then(todo.Remove))
-	skill.RouteIntent(sample.IntentListTodoItems, middleware.Then(todo.List))
+	skill.RouteIntent(sample.IntentAddTodoItem, mw.Then(todo.Add))
+	skill.RouteIntent(sample.IntentRemoveTodoItem, mw.Then(todo.Remove))
+	skill.RouteIntent(sample.IntentListTodoItems, mw.Then(todo.List))
 }
 
 func registerAmazonIntents(skill *golexa.Skill) {
