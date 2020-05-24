@@ -1,3 +1,8 @@
-run-sample:
+run-sample: build-sample
 	@ \
-	go run sample/cmd/main.go
+	bash -c 'out/sample-skill 2> >(jq)'
+
+build-sample:
+	@ \
+	go build -o out/sample-skill sample/cmd/main.go
+

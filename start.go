@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/sirupsen/logrus"
 )
 
 // Start turns on the appropriate listener to handle incoming requests for the given skill. It will
@@ -22,6 +23,10 @@ import (
 //
 // You should only call this once per process!
 func Start(skill Skill) {
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetOutput(os.Stderr)
+	logrus.SetLevel(logrus.DebugLevel)
+
 	wrappedHandler := lambda.NewHandler(skill.Handle)
 
 	switch {
@@ -51,7 +56,7 @@ func startHttp(handlerFunc lambda.Handler) {
 	listener := httpListener{handlerFunc: handlerFunc}
 	port := listener.port()
 
-	fmt.Println(fmt.Sprintf(`{"logger": "golexa", "msg": "Starting golexa on HTTP port %v"}`, port))
+	logrus.WithField("label", "golexa").Infof("Starting HTTP dev server on port %d", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), listener))
 }
 
@@ -75,7 +80,7 @@ func (listener httpListener) port() uint16 {
 func (listener httpListener) ServeHTTP(httpWriter http.ResponseWriter, httpRequest *http.Request) {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println(fmt.Sprintf(`{"logger": "golexa", "msg": "panic: %v"}`, err))
+			logrus.WithField("label", "golexa").Errorf("panic: %v", err)
 			http.Error(httpWriter, "unexpected panic in skill", http.StatusInternalServerError)
 		}
 	}()
