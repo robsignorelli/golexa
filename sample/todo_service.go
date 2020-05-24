@@ -3,23 +3,28 @@ package sample
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/robsignorelli/golexa"
 	"github.com/robsignorelli/golexa/speech"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/text/language"
 )
 
+// SlotItemName is the name of the slot where users specify items to add/remove.
 const SlotItemName = "item_name"
+
+// IntentAddTodoItem is the name of the intent where we add new items to the user's list
 const IntentAddTodoItem = "AddTodoItem"
+
+// IntentRemoveTodoItem is the name of the intent where we remove items from the user's list
 const IntentRemoveTodoItem = "RemoveTodoItem"
+
+// IntentListTodoItems is the name of the intent where we have Alexa rattle off all of a user's items
 const IntentListTodoItems = "ListTodoItems"
 
-func NewTodoService() TodoService {
-	service := TodoService{
-		items: map[string][]string{},
-	}
+// NewTodoService creates a controller/service that handles all of the intents related to managing
+// your items list.
+func NewTodoService(repository TodoRepository) TodoService {
+	service := TodoService{repository: repository}
 
 	// When you hit the "AddTodoItem" intent but didn't specify an item name.
 	service.templateAddElicit = speech.NewTemplate(
@@ -36,6 +41,11 @@ func NewTodoService() TodoService {
 	service.templateRemoveElicit = speech.NewTemplate(
 		`What would you like to remove from your list?`,
 		speech.WithTranslation(language.Spanish, `¿Qué te gustaría eliminar de tu lista?`))
+
+	// When you hit the "RemoveTodoItem" intent but we couldn't find an item w/ that name.
+	service.templateRemoveNotFound = speech.NewTemplate(
+		`I'm sorry. I couldn't find "{{.Value}}" in the list.`,
+		speech.WithTranslation(language.Spanish, `Lo siento. No pude encontrar "{{.Value}}" en la lista.`))
 
 	// The success confirmation for the "RemoveTodoItem" intent
 	service.templateRemoveSuccess = speech.NewTemplate(
@@ -58,20 +68,18 @@ func NewTodoService() TodoService {
 	return service
 }
 
+// TodoService wrangles all of of the dependencies for our list management business logic as well as our
+// handlers and response templates for the various interactions we support.
 type TodoService struct {
-	// items maps a user id to their personal list of items. Please do not do this in a "real" skill
-	// since the resources in your Lambda are ephemeral. Ideally you should be interacting w/ some API
-	// or database service to handle long-term storage of user/skill data. This sample is meant to
-	// highlight how you can set up the Alexa-specific bits of your skill without worrying too much about
-	// how to structure your business logic code.
-	items map[string][]string
+	repository TodoRepository
 
-	templateAddElicit     speech.Template
-	templateAddSuccess    speech.Template
-	templateRemoveElicit  speech.Template
-	templateRemoveSuccess speech.Template
-	templateListEmpty     speech.Template
-	templateListSuccess   speech.Template
+	templateAddElicit      speech.Template
+	templateAddSuccess     speech.Template
+	templateRemoveElicit   speech.Template
+	templateRemoveSuccess  speech.Template
+	templateRemoveNotFound speech.Template
+	templateListEmpty      speech.Template
+	templateListSuccess    speech.Template
 }
 
 // Add appends the item that the user uttered to their personal to-do list. It responds to an
@@ -91,8 +99,7 @@ func (service *TodoService) Add(_ context.Context, request golexa.Request) (gole
 	}
 
 	// Do your "business logic" to handle the user's request.
-	userID := request.Session.User.ID
-	service.items[userID] = append(service.items[userID], itemName)
+	service.repository.AddItem(request.Session.User.ID, itemName)
 
 	// Have Alexa speak some sort of confirmation.
 	return golexa.NewResponse(request).
@@ -100,6 +107,8 @@ func (service *TodoService) Add(_ context.Context, request golexa.Request) (gole
 		Ok()
 }
 
+// Remove obviously removes an item from the user's list who made the utterance. Just like Add(),
+// this will have Alexa ask the user to specify which item they want to remove.
 func (service *TodoService) Remove(_ context.Context, request golexa.Request) (golexa.Response, error) {
 	// Not a failure. Have Alexa prompt the user for what the items should be. Once the user
 	// responds, this intent should be re-invoked, but this time with the name filled in.
@@ -111,14 +120,23 @@ func (service *TodoService) Remove(_ context.Context, request golexa.Request) (g
 			Ok()
 	}
 
-	service.removeItem(request.Session.User.ID, itemName)
+	// Do your "business logic" to handle the user's request.
+	if err := service.repository.RemoveItem(request.Session.User.ID, itemName); err == ErrItemNotFound {
+		return golexa.NewResponse(request).
+			SpeakTemplate(service.templateRemoveNotFound, itemName).
+			Ok()
+	}
+
+	// Have Alexa speak some sort of confirmation.
 	return golexa.NewResponse(request).
 		SpeakTemplate(service.templateRemoveSuccess, itemName).
 		Ok()
 }
 
+// List simply has Alexa rattle off ALL of the items on your list. This is just a sample skill, so
+// this would be a terrible experience if the the list were any longer than 3 or 4 items.
 func (service *TodoService) List(_ context.Context, request golexa.Request) (golexa.Response, error) {
-	items := service.items[request.Session.User.ID]
+	items := service.repository.GetItems(request.Session.User.ID)
 	if len(items) == 0 {
 		return golexa.NewResponse(request).
 			SpeakTemplate(service.templateListEmpty, nil).
@@ -128,52 +146,4 @@ func (service *TodoService) List(_ context.Context, request golexa.Request) (gol
 	return golexa.NewResponse(request).
 		SpeakTemplate(service.templateListSuccess, items).
 		Ok()
-}
-
-// removeItem provides the "hand-waving" for our business logic to remove an item from
-// this user's list in the "database"
-func (service *TodoService) removeItem(userID, removeMe string) {
-	items := service.items[userID]
-	if items == nil {
-		return
-	}
-	for i, userItem := range items {
-		if userItem == removeMe {
-			service.items[userID] = append(items[:i], items[i+1:]...)
-			return
-		}
-	}
-}
-
-// ValidateUser ensures that the user/device has gone through "Account Linking" so we've linked
-// the Amazon user to a user in our system. When they're linked, Amazon will provide an OAuth2 access
-// token with the request, so we can validate the existence of that field.
-func ValidateUser(ctx context.Context, request golexa.Request, next golexa.HandlerFunc) (golexa.Response, error) {
-	if request.Context.System.User.AccessToken == "" {
-		return golexa.NewResponse(request).Speak("I'm sorry. Please link your account through the Alexa app.").Ok()
-	}
-	return next(ctx, request)
-}
-
-// LogRequest prints some JSON logging that includes the current time and the incoming request JSON. It also
-// writes a second log line once the request is complete, outputting how long the request took.
-func LogRequest(ctx context.Context, request golexa.Request, next golexa.HandlerFunc) (golexa.Response, error) {
-	logrus.WithField("label", "golexa").
-		WithField("request_id", request.Body.RequestID).
-		WithField("payload", request).
-		Infof("Request started")
-
-	// The call to next() doesn't need to be the last line, so we can do more work after the "real"
-	// request handling work has been done.
-	startTime := time.Now()
-	response, err := next(ctx, request)
-	elapsed := time.Now().Sub(startTime)
-
-	logrus.WithField("label", "golexa").
-		WithField("request_id", request.Body.RequestID).
-		WithField("elapsed", elapsed).
-		WithField("elapsed_human", elapsed.String()).
-		Infof("Request complete")
-
-	return response, err
 }
