@@ -6,6 +6,7 @@ import (
 	"github.com/robsignorelli/golexa"
 	"github.com/robsignorelli/golexa/middleware"
 	"github.com/robsignorelli/golexa/sample"
+	"github.com/robsignorelli/golexa/speech"
 )
 
 func main() {
@@ -16,13 +17,16 @@ func main() {
 }
 
 func registerSkillIntents(skill *golexa.Skill) {
+	// All of our list management intents should log the request and deny access to users
+	// that haven't gone through account linking.
 	mw := golexa.Middleware{
 		middleware.Logger(
 			middleware.LogRequestJSON(),
 			middleware.LogResponseSpeech()),
-		sample.ValidateUser,
+		middleware.RequireAccount(
+			middleware.RequireAccountTemplate(speech.NewTemplate("Link up your account, dude!"))),
 	}
-	todo := sample.NewTodoService()
+	todo := sample.NewTodoService(sample.NewTodoRepository())
 	skill.RouteIntent(sample.IntentAddTodoItem, mw.Then(todo.Add))
 	skill.RouteIntent(sample.IntentRemoveTodoItem, mw.Then(todo.Remove))
 	skill.RouteIntent(sample.IntentListTodoItems, mw.Then(todo.List))
