@@ -47,6 +47,7 @@ package main
 
 import (
     "context"
+
     "github.com/robsignorelli/golexa"
 )
 
@@ -55,11 +56,11 @@ func main() {
 
     skill.RouteIntent("HelloIntent", func(ctx context.Context, req golexa.Request) (golexa.Response, error) {
         name := req.Body.Intent.Slots.Resolve("name")
-        return golexa.NewResponse().Speak("Hello " + name).Ok()
+        return golexa.NewResponse(req).Speak("Hello " + name).Ok()
     })
     skill.RouteIntent("GoodbyeIntent", func(ctx context.Context, req golexa.Request) (golexa.Response, error) {
         name := req.Body.Intent.Slots.Resolve("name")
-        return golexa.NewResponse().Speak("Goodbye " + name).Ok()
+        return golexa.NewResponse(req).Speak("Goodbye " + name).Ok()
     })
 	
     golexa.Start(skill)
@@ -80,35 +81,101 @@ request or validate that a user has linked their Amazon account to
 your system before doing any real work. All of this can be done using
 middleware, similar to how you might do this in a REST API.
 
-```
+The `golexa` framework provides a couple of middleware functions out of the
+box for logging and making sure that the user has an access token (i.e. set up account linking),
+but you can easily create your own by implementing a function with the proper signature.
+
+```go
 func main() {
-    middleware := golexa.Middleware{
-        LogRequest,
-        ValidateUser,
+    mw := golexa.Middleware{
+        middleware.Logger(),
+        middleware.RequireAccount(),
+        CustomMiddleware
     }
     
-    // Log & authenticate the add/remove intents, but not the status intent.
-    service := FancyService{}
-    skill.RouteIntent("FancyAddIntent", middleware.Then(service.Add))
-    skill.RouteIntent("FancyRemoveIntent", middleware.Then(service.Remove))
+    // Log, authorize, and do custom work on the add/remove intents, but not the status intent.
+    service := NewFancyService()
+	skill := golexa.Skill{}
+    skill.RouteIntent("FancyAddIntent", mw.Then(service.Add))
+    skill.RouteIntent("FancyRemoveIntent", mw.Then(service.Remove))
     skill.RouteIntent("FancyStatusIntent", service.Status)
     golexa.Start(skill)
 }
 
-func LogRequest(ctx context.Context, request Request, next HandlerFunc) (Response, error) {
-    fmt.Println("... log something interesting ...")
-    return next(ctx, request)
-}
-
-func ValidateUser(ctx context.Context, request Request, next HandlerFunc) (Response, error) {
-    if request.Session.User.AccessToken == "" {
-        return golexa.NewResponse().Speak("No soup for you.").Ok()
-    }
-    return next(ctx, request)
+func CustomMiddleware(ctx context.Context, request Request, next HandlerFunc) (Response, error) {
+    // ... do something awesome before the request ...
+    res, err := next(ctx, request)
+    // ... do something awesome after the request ...
+    return res, err
 }
 ```
 
+## Templates
 
+Chances are that most of your intents have some sort of standard format/template for how you want
+to respond to the user. It's super easy to define speech templates using standard Go templating
+and evaluate them with whatever runtime data you want. In this example, the `.Value` of the template
+context is just a string, but you can make it whatever you want for more complex responses.
+
+```go
+greetingHello := speech.NewTemplate("Hello {{.Value}}")
+greetingGoodbye := speech.NewTemplate("Goodbye {{.Value}}")
+
+skill := golexa.Skill{}
+skill.RouteIntent("GreetingIntent", func(ctx context.Context, req golexa.Request) (golexa.Response, error) {
+    name := req.Body.Intent.Slots.Resolve("name")
+
+    if shouldSayHello(req) {
+        return golexa.NewResponse(req).SpeakTemplate(greetingHello, name).Ok()
+    }
+    return golexa.NewResponse(req).SpeakTemplate(greetingGoodbye, name).Ok()
+})
+
+```
+
+You can also inject custom functions into your templates to perform more processing as you see fit by passing
+in any number of `WithFunc()` options into your `NewTemplate()` call.
+
+```go
+greetingHello := speech.NewTemplate("Hello {{.Value | jumble}}",
+    speech.WithFunc("jumble", jumbleText))
+
+...
+
+func jumbleText(value string) string {
+    // ... shuffling logic goes here ...
+}
+```
+
+## Templates: Multi-Language Support
+
+Why limit yourself to just English? Golexa speech templates provide simple hooks to support ANY of the
+locales/languages that Alexa supports ([see full list here](https://developer.amazon.com/en-US/docs/alexa/custom-skills/develop-skills-in-multiple-languages.html#h2-code-changes)).
+
+```go
+greetingHello := speech.NewTemplate("Hello {{.Value}}",
+    speech.WithTranslation(language.Spanish, `Hola {{.Value}}`),
+    speech.WithTranslation(language.Italian, `Ciao {{.Value}}`),
+)
+```
+
+Now when you respond w/ this template and the `name` slot is "Rob", Alexa
+will say "Hola Rob" when the locale is "es", "es-MX", "es-ES", etc. It
+will cay "Ciao Rob" when the locale is any locale that starts with "it"
+and it will fall back to the English translation of "Hello Rob" for
+any other language.
+
+In this example, I use the same translation for all Spanish variants, but
+you can just as easily support different language variants, too:
+
+```go
+// You could use "language.LatinAmericanSpanish" and "language.EuropeanSpanish"
+// instead of parsing, but I wanted to show you the actual locale names.
+greetingHello := speech.NewTemplate("Hello {{.Value}}",
+    speech.WithTranslation(language.MustParse("es-MX"), `Hola {{.Value}}`),
+    speech.WithTranslation(language.MustParse("es-ES"), `Hola from Spain, {{.Value}}`))
+)
+```
 
 ## Future Enhancements
 
@@ -117,7 +184,6 @@ other ideas that could help you in your projects, feel free to add
 an issue and I'll take a look.
 
 * Tests
-* Some sort of templating to make generating speech responses easier
 * Echo Show display template directive support
 * Name free interactions through `CanFulfillIntentRequest`
 
