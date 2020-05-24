@@ -1,5 +1,7 @@
 package golexa
 
+import "golang.org/x/text/language"
+
 const (
 	RequestTypeCanFulfillIntent = "CanFulfillIntentRequest"
 	RequestTypeIntent           = "IntentRequest"
@@ -55,6 +57,46 @@ type requestBody struct {
 	Intent      *intentRequest `json:"intent,omitempty"`
 	Reason      string         `json:"reason,omitempty"`
 	DialogState string         `json:"dialogState,omitempty"`
+}
+
+var supportedLanguages = map[string]language.Tag{
+	"": language.AmericanEnglish,
+
+	// Fallbacks that don't specify a language variant. Make a best guess.
+	"en": language.MustParse("es-US"),
+	"es": language.MustParse("es-MX"),
+	"de": language.MustParse("de-DE"),
+	"fr": language.MustParse("fr-FR"),
+	"hi": language.MustParse("hi-IN"),
+	"it": language.MustParse("it-IT"),
+	"ja": language.MustParse("ja-JP"),
+	"pt": language.MustParse("pt-BR"),
+
+	// The actual list of supported language/variants
+	"de-DE": language.MustParse("de-DE"),
+	"en-AU": language.MustParse("en-AU"),
+	"en-CA": language.MustParse("en-CA"),
+	"en-GB": language.MustParse("en-GB"),
+	"en-IN": language.MustParse("en-IN"),
+	"en-US": language.MustParse("en-US"),
+	"es-ES": language.MustParse("es-ES"),
+	"es-MX": language.MustParse("es-MX"),
+	"es-US": language.MustParse("es-US"),
+	"fr-CA": language.MustParse("fr-CA"),
+	"fr-FR": language.MustParse("fr-FR"),
+	"hi-IN": language.MustParse("hi-IN"),
+	"it-IT": language.MustParse("it-IT"),
+	"ja-JP": language.MustParse("ja-JP"),
+	"pt-BR": language.MustParse("pt-BR"),
+}
+
+// Language parses the incoming 'locale' attribute to determine the language we should
+// use for translating text.
+func (req Request) Language() language.Tag {
+	if lang, ok := supportedLanguages[req.Body.Locale]; ok {
+		return lang
+	}
+	return language.AmericanEnglish
 }
 
 type systemContext struct {

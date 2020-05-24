@@ -1,6 +1,7 @@
 # Created by https://www.gitignore.io/api/go,osx,linux,intellij
 # Edit at https://www.gitignore.io/?templates=go,osx,linux,intellij
 
+/out
 
 ### Go ###
 # Binaries for programs and plugins

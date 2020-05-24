@@ -3,12 +3,17 @@ package golexa
 import (
 	"errors"
 	"strings"
+	"time"
+
+	"github.com/robsignorelli/golexa/speech"
+	"github.com/sirupsen/logrus"
 )
 
 // NewResponse create a bare-bones response instance that you can continue to expand on
 // with additional instructions for Alexa like `Speak()` or `SimpleCard()`.
-func NewResponse() Response {
+func NewResponse(request Request) Response {
 	r := Response{
+		Request: request,
 		Version: "1.0",
 		Body:    responseBody{},
 	}
@@ -29,6 +34,19 @@ func (r Response) Speak(textOrSSML string) Response {
 		SSML: wrapSSML(textOrSSML),
 	}
 	return r
+}
+
+func (r Response) SpeakTemplate(template speech.Template, value interface{}) Response {
+	textOrSSML, err := template.Eval(speech.TemplateContext{
+		Language: r.Request.Language(),
+		Now:      time.Now(),
+		Value:    value,
+	})
+	if err != nil {
+		logrus.Error("unable to speak template: %v", err)
+		return r.Speak("I'm sorry. I seem to have trouble with words, today.")
+	}
+	return r.Speak(textOrSSML)
 }
 
 // SimpleCard customizes what the user should see on an Echo device that supports a screen
@@ -98,6 +116,7 @@ func Fail(message string) (Response, error) {
 //
 // Also see https://developer.amazon.com/docs/custom-skills/request-and-response-json-reference.html#response-format
 type Response struct {
+	Request           Request                `json:"-"`
 	Version           string                 `json:"version"`
 	SessionAttributes map[string]interface{} `json:"sessionAttributes,omitempty"`
 	Body              responseBody           `json:"response"`

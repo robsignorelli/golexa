@@ -26,19 +26,19 @@ func registerSkillIntents(skill *golexa.Skill) {
 }
 
 func registerAmazonIntents(skill *golexa.Skill) {
-	skill.RouteIntent(golexa.IntentNameCancel, func(context.Context, golexa.Request) (golexa.Response, error) {
-		return golexa.NewResponse().Speak("Canceling.").Ok()
+	skill.RouteIntent(golexa.IntentNameCancel, func(_ context.Context, req golexa.Request) (golexa.Response, error) {
+		return golexa.NewResponse(req).Speak("Canceling.").Ok()
 	})
-	skill.RouteIntent(golexa.IntentNameStop, func(context.Context, golexa.Request) (golexa.Response, error) {
-		return golexa.NewResponse().Ok()
+	skill.RouteIntent(golexa.IntentNameStop, func(_ context.Context, req golexa.Request) (golexa.Response, error) {
+		return golexa.NewResponse(req).Ok()
 	})
-	skill.RouteIntent(golexa.IntentNameHelp, func(context.Context, golexa.Request) (golexa.Response, error) {
-		return golexa.NewResponse().Speak("You can ask me to add, remove, or list items.").Ok()
+	skill.RouteIntent(golexa.IntentNameHelp, func(_ context.Context, req golexa.Request) (golexa.Response, error) {
+		return golexa.NewResponse(req).Speak("You can ask me to add, remove, or list items.").Ok()
 	})
-	skill.RouteIntent(golexa.IntentNameFallback, func(context.Context, golexa.Request) (golexa.Response, error) {
-		return golexa.NewResponse().Speak("I'm sorry. This skill doesn't know how to do that.").Ok()
+	skill.RouteIntent(golexa.IntentNameFallback, func(_ context.Context, req golexa.Request) (golexa.Response, error) {
+		return golexa.NewResponse(req).Speak("I'm sorry. This skill doesn't know how to do that.").Ok()
 	})
-	skill.RouteIntent(golexa.IntentNameNavigateHome, func(context.Context, golexa.Request) (golexa.Response, error) {
-		return golexa.NewResponse().Ok()
+	skill.RouteIntent(golexa.IntentNameNavigateHome, func(_ context.Context, req golexa.Request) (golexa.Response, error) {
+		return golexa.NewResponse(req).Ok()
 	})
 }
