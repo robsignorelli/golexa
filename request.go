@@ -19,6 +19,40 @@ type Request struct {
 	Context requestContext `json:"context"`
 }
 
+// UserID traverses the request structure to extract the id of the Amazon/Alexa user making the call.
+func (r Request) UserID() string {
+	return r.Context.System.User.ID
+}
+
+// UserAccessToken traverses the request structure to extract the account-linked access token for the caller.
+func (r Request) UserAccessToken() string {
+	return r.Context.System.User.AccessToken
+}
+
+// DeviceID traverses the request structure to extract the id of the device making the call.
+func (r Request) DeviceID() string {
+	return r.Context.System.Device.ID
+}
+
+// SkillID returns the id of the skill that was invoked to handle this request.
+func (r Request) SkillID() string {
+	return r.Context.System.Application.ID
+}
+
+// SessionID traverses the request structure to extract the id of the Amazon/Alexa session making the call.
+func (r Request) SessionID() string {
+	return r.Session.ID
+}
+
+// Language parses the incoming 'locale' attribute to determine the language we should
+// use for translating text.
+func (r Request) Language() language.Tag {
+	if lang, ok := supportedLanguages[r.Body.Locale]; ok {
+		return lang
+	}
+	return language.AmericanEnglish
+}
+
 // Application identifies the skill whose interaction model was used to invoke this request.
 type Application struct {
 	ID string `json:"applicationId,omitempty"`
@@ -90,15 +124,6 @@ var supportedLanguages = map[string]language.Tag{
 	"pt-BR": language.MustParse("pt-BR"),
 }
 
-// Language parses the incoming 'locale' attribute to determine the language we should
-// use for translating text.
-func (req Request) Language() language.Tag {
-	if lang, ok := supportedLanguages[req.Body.Locale]; ok {
-		return lang
-	}
-	return language.AmericanEnglish
-}
-
 type systemContext struct {
 	User           User        `json:"user,omitempty"`
 	Device         Device      `json:"device,omitempty"`
@@ -118,4 +143,18 @@ type intentRequest struct {
 	Name               string `json:"name"`
 	Slots              Slots  `json:"slots"`
 	ConfirmationStatus string `json:"confirmationStatus"`
+}
+
+// NewIntentRequest creates a minimal request instance you can use to write
+// unit tests for your intent requests.
+func NewIntentRequest(intentName string, slots Slots) Request {
+	return Request{
+		Version: "1.0",
+		Body: requestBody{
+			Intent: &intentRequest{
+				Name:  intentName,
+				Slots: slots,
+			},
+		},
+	}
 }

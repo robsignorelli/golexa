@@ -43,7 +43,7 @@ func (r Response) SpeakTemplate(template speech.Template, value interface{}) Res
 		Value:    value,
 	})
 	if err != nil {
-		logrus.Error("unable to speak template: %v", err)
+		logrus.Errorf("unable to speak template: %v", err)
 		return r.Speak("I'm sorry. I seem to have trouble with words, today.")
 	}
 	return r.Speak(textOrSSML)
@@ -68,8 +68,12 @@ func (r Response) SimpleCard(title, text string) Response {
 // For example, if you're setting up some sort of game, you might respond with the speech "How many players?"
 // and `ElicitSlot(req, "StartGameIntent", "num_players")`. Once the user tell you how many players
 // then that slot info will be sent to your "StartGameIntent".
-func (r Response) ElicitSlot(request Request, intentName, slotName string) Response {
-	slots := request.Body.Intent.Slots.Clone()
+func (r Response) ElicitSlot(intentName, slotName string) Response {
+	if intentName == "" || slotName == "" {
+		return r
+	}
+
+	slots := r.Request.Body.Intent.Slots.Clone()
 	slots[slotName] = Slot{Name: slotName, Value: ""}
 
 	r.Body.Directives = append(r.Body.Directives, directive{
@@ -86,8 +90,10 @@ func (r Response) ElicitSlot(request Request, intentName, slotName string) Respo
 // when they're asked to fill in one of the slots, this will be a second audio prompt to try to get them
 // to say something. If the user actually responded the first time, they won't actually hear this.
 func (r Response) Reprompt(textOrSSML string) Response {
-	r.Body.Reprompt.OutputSpeech = intentResponse{
-		SSML: wrapSSML(textOrSSML),
+	r.Body.Reprompt = &reprompt{
+		OutputSpeech: intentResponse{
+			SSML: wrapSSML(textOrSSML),
+		},
 	}
 	return r
 }
