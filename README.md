@@ -5,7 +5,7 @@ here currently to deploy a basic Alexa skill in Go, there are a ton
 of rough edges that need to be shaved off and features that I need to
 add before I would not be embarrassed by someone using this.**_
 
-This is a framework that helps you ship Alexa skill code using
+golexa is a framework that helps you ship Alexa skill code using
 Go on AWS Lambda. Amazon has official SDKs for Java, Node, and Python, but
 even though Go is a great language for FaaS workloads like this, they've
 not released a Go SDK yet. This project tries to fill that gap as much
@@ -125,12 +125,13 @@ skill := golexa.Skill{}
 skill.RouteIntent("GreetingIntent", func(ctx context.Context, req golexa.Request) (golexa.Response, error) {
     name := req.Body.Intent.Slots.Resolve("name")
 
-    if shouldSayHello(req) {
+    switch {
+    case shouldSayHello(req):
         return golexa.NewResponse(req).SpeakTemplate(greetingHello, name).Ok()
+    default:
+        return golexa.NewResponse(req).SpeakTemplate(greetingGoodbye, name).Ok()
     }
-    return golexa.NewResponse(req).SpeakTemplate(greetingGoodbye, name).Ok()
 })
-
 ```
 
 You can also inject custom functions into your templates to perform more processing as you see fit by passing
@@ -177,13 +178,51 @@ greetingHello := speech.NewTemplate("Hello {{.Value}}",
 )
 ```
 
+# Back-and-Forth Interactions w/ ElicitSlot
+
+You want your interactions to be as friendly to your users as possible. For instance, you might
+have an interaction/intent where users might want to add an item to their list that you're 
+maintaining for them. You might want to support both of these phrases:
+
+```
+AddItemIntent
+  Add {item_name} to my list
+  Update my list
+```
+
+In the first case the user provides the name of the item they want to add, so you have all of
+the information you need to complete the request. In the latter case, you don't, so you want
+to have Alexa prompt the user for that information and then trying again. Here's how you can
+use `golexa` to fulfill the request when you have everything, and "elicit slot" when you don't.
+
+```go
+skill.RouteIntent("AddItemIntent", func(ctx context.Context, req golexa.Request) (golexa.Response, error) {
+    itemName := req.Body.Intent.Slots.Resolve("item_name")
+
+    // They said "update my list", so have their device ask them for the
+    // item name and send the result back to this intent again.
+    if itemName == "" {
+        return golexa.NewResponse(req).
+            Speak("What would you like me to add to the list?").
+        	ElicitSlot("AddItemIntent", "item_name").
+        	Ok()
+    }
+
+    // They either specified the "item_name" slot in the initial request or
+    // we were redirected back here after an ElicitSlot.
+    addItemToList(req.UserID(), itemName)
+    return golexa.NewResponse(req).
+        Speak("Great! I've added that to your list.").
+        Ok()
+})
+```
+
 ## Future Enhancements
 
 Here are a couple of the things I plan to bang away at. If you have any
 other ideas that could help you in your projects, feel free to add
 an issue and I'll take a look.
 
-* Tests
 * Echo Show display template directive support
 * Name free interactions through `CanFulfillIntentRequest`
 

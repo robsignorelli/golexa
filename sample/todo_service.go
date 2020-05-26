@@ -94,7 +94,7 @@ func (service *TodoService) Add(_ context.Context, request golexa.Request) (gole
 	if itemName == "" {
 		return golexa.NewResponse(request).
 			SpeakTemplate(service.templateAddElicit, nil).
-			ElicitSlot(request, IntentAddTodoItem, SlotItemName).
+			ElicitSlot(IntentAddTodoItem, SlotItemName).
 			Ok()
 	}
 
@@ -116,7 +116,7 @@ func (service *TodoService) Remove(_ context.Context, request golexa.Request) (g
 	if itemName == "" {
 		return golexa.NewResponse(request).
 			SpeakTemplate(service.templateRemoveElicit, nil).
-			ElicitSlot(request, IntentAddTodoItem, SlotItemName).
+			ElicitSlot(IntentAddTodoItem, SlotItemName).
 			Ok()
 	}
 
