@@ -178,7 +178,7 @@ greetingHello := speech.NewTemplate("Hello {{.Value}}",
 )
 ```
 
-# Back-and-Forth Interactions w/ ElicitSlot
+## Back-and-Forth Interactions w/ ElicitSlot
 
 You want your interactions to be as friendly to your users as possible. For instance, you might
 have an interaction/intent where users might want to add an item to their list that you're 
@@ -204,8 +204,8 @@ skill.RouteIntent("AddItemIntent", func(ctx context.Context, req golexa.Request)
     if itemName == "" {
         return golexa.NewResponse(req).
             Speak("What would you like me to add to the list?").
-        	ElicitSlot("AddItemIntent", "item_name").
-        	Ok()
+            ElicitSlot("AddItemIntent", "item_name").
+            Ok()
     }
 
     // They either specified the "item_name" slot in the initial request or
