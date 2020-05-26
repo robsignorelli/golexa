@@ -22,7 +22,7 @@ func (s Slots) Clone() Slots {
 	for slotName, slot := range s {
 		slots[slotName] = Slot{Name: slot.Name, Value: slot.Resolve()}
 	}
-	return Slots(slots)
+	return slots
 }
 
 // Resolve locates the specified slot entry and returns its resolved value.
@@ -82,4 +82,43 @@ type resolutionValues struct {
 type resolutionValue struct {
 	Name string `json:"name"`
 	ID   string `json:"id"`
+}
+
+// NewResolvedSlot is mainly used for faking test data to create a slot that
+// has an uttered value as well as a resolution value.
+func NewResolvedSlot(name, value, resolvedValue string) Slot {
+	return Slot{
+		Name:  name,
+		Value: value,
+		Resolutions: resolutions{
+			ResolutionPerAuthority: resolutionAuthorities{
+				resolutionPerAuthority{
+					Status: resolutionStatus{
+						Code: resolutionSuccessCode,
+					},
+					Values: []resolutionValues{
+						{Value: resolutionValue{Name: resolvedValue}},
+					},
+				},
+			},
+		},
+	}
+}
+
+// NewSlot is used primarily for faking data in tests. It creates a simple slot/value with
+// no alternate resolution info.
+func NewSlot(name, value string) Slot {
+	return Slot{
+		Name:  name,
+		Value: value,
+	}
+}
+
+// NewSlots creates a Slots map containing entries for all of the individual slot values.
+func NewSlots(values ...Slot) Slots {
+	slots := Slots{}
+	for _, value := range values {
+		slots[value.Name] = value
+	}
+	return slots
 }

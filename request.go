@@ -151,6 +151,7 @@ func NewIntentRequest(intentName string, slots Slots) Request {
 	return Request{
 		Version: "1.0",
 		Body: requestBody{
+			Type: RequestTypeIntent,
 			Intent: &intentRequest{
 				Name:  intentName,
 				Slots: slots,

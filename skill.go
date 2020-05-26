@@ -9,6 +9,15 @@ import (
 // react to the user's utterance/request.
 type HandlerFunc func(ctx context.Context, request Request) (Response, error)
 
+// The standard intents that your skill should implement to handle standard Alexa interactions.
+const (
+	IntentNameCancel       = "AMAZON.CancelIntent"
+	IntentNameFallback     = "AMAZON.FallbackIntent"
+	IntentNameHelp         = "AMAZON.HelpIntent"
+	IntentNameNavigateHome = "AMAZON.NavigateHomeIntent"
+	IntentNameStop         = "AMAZON.StopIntent"
+)
+
 // Skill is the root data structure for your program. It wrangles all of the handlers for the
 // different types of requests your skill is expected to encounter.
 type Skill struct {
@@ -82,4 +91,9 @@ func (skill Skill) handleLaunch(ctx context.Context, request Request) (Response,
 		return Fail("golexa: no handler registered for LaunchRequest")
 	}
 	return skill.launch(ctx, request)
+}
+
+type intentRoute struct {
+	handlerFunc HandlerFunc
+	name        string
 }
